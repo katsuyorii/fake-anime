@@ -49,6 +49,23 @@ async def create_refresh_token(payload: dict, expires_delta: timedelta | None = 
 
     return refresh_token
 
+async def verify_access_token(access_token: str) -> dict:
+    try:
+        payload = jwt.decode(jwt=access_token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401,
+            detail="Access токен истёк. Пожалуйста, войдите снова.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=401,
+            detail="Недействительный access токен. Проверьте правильность данных.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 async def verify_refresh_token(refresh_token: str) -> dict:
     try:
         payload = jwt.decode(jwt=refresh_token, key=settings.REFRESH_SECRET_KEY, algorithms=[settings.ALGORITHM])
