@@ -24,5 +24,17 @@ services:
       - db
     command: bash entrypoint.sh
 
+  cache:
+    image: redis:7.4
+    container_name: redis
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "6379:6379"
+    depends_on:
+      - db
+      - backend
+
 volumes:
   postgres_data:
