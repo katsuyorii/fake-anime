@@ -1,14 +1,16 @@
-from fastapi import HTTPException, Response
+from fastapi import HTTPException, Response, Request
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from redis.asyncio import Redis
 
 from datetime import timedelta
 
 from src.config import settings
 from users.models import UserModel
 from .schemas import TokenResponseSchema, UserRegisterSchema, UserLoginSchema
-from .utils import hashing_password, verify_password, create_access_token, create_refresh_token
+from .utils import hashing_password, verify_password, create_access_token, create_refresh_token, add_token_to_blacklist
 from .exceptions import INVALID_CREDENTIALS_ERROR
 
 
@@ -41,11 +43,11 @@ async def login(user: UserLoginSchema, response: Response, db: AsyncSession) -> 
         raise INVALID_CREDENTIALS_ERROR
     
     access_token = await create_access_token({
-        'sub': existing_user.id,
+        'sub': str(existing_user.id),
     })
 
     refresh_token = await create_refresh_token({
-        'sub': existing_user.id,
+        'sub': str(existing_user.id),
     })
 
     response.set_cookie(
@@ -67,3 +69,10 @@ async def login(user: UserLoginSchema, response: Response, db: AsyncSession) -> 
     )
 
     return TokenResponseSchema(access_token=access_token)
+
+async def logout(request: Request, response: Response, redis: Redis):
+    refresh_token = request.cookies.get('refresh_token')
+    await add_token_to_blacklist(refresh_token, redis)
+
+    response.delete_cookie('access_token')
+    response.delete_cookie('refresh_token')
