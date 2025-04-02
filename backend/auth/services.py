@@ -10,7 +10,7 @@ from datetime import timedelta
 from src.config import settings
 from users.models import UserModel
 from .schemas import TokenResponseSchema, UserRegisterSchema, UserLoginSchema
-from .utils import hashing_password, verify_password, create_access_token, create_refresh_token, add_token_to_blacklist
+from .utils import hashing_password, verify_password, create_access_token, create_refresh_token,  verify_refresh_token, add_token_to_blacklist, is_token_to_blacklist
 from .exceptions import INVALID_CREDENTIALS_ERROR
 
 
@@ -76,3 +76,33 @@ async def logout(request: Request, response: Response, redis: Redis):
 
     response.delete_cookie('access_token')
     response.delete_cookie('refresh_token')
+
+async def refresh(request: Request, response: Response, redis: Redis) -> TokenResponseSchema:
+    refresh_token = request.cookies.get('refresh_token')
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Refresh token отсутствует!"
+        )
+    
+    if await is_token_to_blacklist(refresh_token, redis):
+        raise HTTPException(
+            status_code=401,
+            detail='Refresh токен заблокирован!'
+        )
+    
+    payload = await verify_refresh_token(refresh_token)
+
+    new_access_token = await create_access_token(payload)
+
+    response.set_cookie(
+        key='access_token',
+        value=new_access_token,
+        secure=True,
+        httponly=True,
+        max_age=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        samesite='Strict',
+    )
+
+    return TokenResponseSchema(access_token=new_access_token)

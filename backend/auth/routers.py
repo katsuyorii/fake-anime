@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_session
 from src.redis import get_redis
 from .schemas import TokenResponseSchema, UserRegisterSchema, UserLoginSchema
-from .services import registration, login, logout
+from .services import registration, login, logout, refresh
 
 
 auth_router = APIRouter(
@@ -28,3 +28,7 @@ async def logout_user(request: Request, response: Response, redis = Depends(get_
     await logout(request, response, redis)
 
     return {"message": "Вы успещно вышли из системы!"}
+
+@auth_router.post('/refresh', response_model=TokenResponseSchema)
+async def refresh_token(request: Request, response: Response, redis = Depends(get_redis)):
+    return await refresh(request, response, redis)
